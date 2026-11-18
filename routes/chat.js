@@ -105,65 +105,33 @@ router.delete("/thread/:threadId", authMiddleware, async (req, res) => {
 router.post("/chat", authMiddleware, async (req, res) => {
   const { threadId, message } = req.body;
 
-  if (!threadId || !message || typeof message !== "string" || !message.trim()) {
-    return res.status(400).json({
-      error: "Valid threadId and message are required"
-    });
-  }
+  if (!threadId || !message) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }  
 
   try {
-    let thread = await Thread.findOne({
-      threadId,
-      userId: req.userId
-    });
+    let thread = await Thread.findOne({ threadId, userId: req.userId });
 
     if (!thread) {
-      thread = new Thread({
-        userId: req.userId,
-        threadId,
-        title: message.length > 30
-          ? message.substring(0, 30) + "..."
-          : message,
-        messages: [
-          { role: "user", content: message }
-        ]
-      });
+         thread = new Thread({
+            userId: req.userId, 
+            threadId,
+            title: message.length > 30 ? message.substring(0, 30) + "..." : message,
+            messages: [{ role: "user", content: message }]
+         });
     } else {
-      thread.messages.push({
-        role: "user",
-        content: message
-      });
+        thread.messages.push({ role: "user", content: message });
     }
 
-    // Get Gemini response
     const assistantReply = await getOpenAIAPIResponse(message);
-
-    // Validate AI response
-    if (typeof assistantReply !== "string" || !assistantReply.trim()) {
-      throw new Error("Invalid AI response");
-    }
-
-    // Save assistant response
-    thread.messages.push({
-      role: "assistant",
-      content: assistantReply
-    });
-
+    thread.messages.push({ role: "assistant", content: assistantReply });
+    
     await thread.save();
-
-    res.json({
-      threadId: thread.threadId,
-      reply: assistantReply
-    });
-
+    res.json({ reply: assistantReply });
   } catch (err) {
-    console.error("Chat Route Error:", err.message);
-
-    res.status(500).json({
-      error: "Something went wrong",
-      details: err.message
-    });
+    console.log(err);
+    res.status(500).json({ error: "Something went wrong" });
   }
-}); 
+});
 
 export default router;
